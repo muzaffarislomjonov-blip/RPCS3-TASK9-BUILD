@@ -77,7 +77,7 @@ jobs:
           if ($installerVersion -match 'aqtinstall\(aqt\) v3\.3\.0(\D|$)') {
             throw "Unexpected legacy aqtinstall 3.3.0 selected"
           }
-          python -m aqt install-qt windows desktop 6.11.2 win64_msvc2022_64 -O C:\Qt -m qtmultimedia qtsvg
+          python -m aqt install-qt windows desktop 6.11.2 win64_msvc2022_64 -O C:\Qt -m qtmultimedia
           $qtBin = "C:\Qt\6.11.2\msvc2022_64\bin"
           if (!(Test-Path -LiteralPath $qtBin)) {
             throw "Qt bin directory not found after install: $qtBin"
@@ -226,3 +226,4 @@ jobs:
           name: ${{ env.ARTIFACT_NAME }}
           path: package/RPCS3_TASK9_TRACE_2416d652
           if-no-files-found: error
+
