@@ -1,0 +1,245 @@
+diff --git a/rpcs3/Emu/Memory/vm.h b/rpcs3/Emu/Memory/vm.h
+index c59e32d5b..52c7be39a 100644
+--- a/rpcs3/Emu/Memory/vm.h
++++ b/rpcs3/Emu/Memory/vm.h
+@@ -7,6 +7,7 @@
+ #include "util/auto_typemap.hpp"
+ 
+ #include "util/to_endian.hpp"
++#include "Emu/task9_live_trace.h"
+ 
+ class ppu_thread;
+ 
+@@ -274,6 +275,7 @@ namespace vm
+ #endif
+ 	{
+ 		g_base_addr[addr] = value;
++		task9_live_trace::trace_player_write(addr, value, 8, nullptr);
+ 
+ #ifdef RPCS3_HAS_MEMORY_BREAKPOINTS
+ 		if (ppu && g_breakpoint_handler.HasBreakpoint(addr, breakpoint_types::bp_write))
+@@ -319,7 +321,7 @@ namespace vm
+ 		inline void write(u32 addr, U value, ppu_thread* ppu = nullptr)
+ #else
+ 		template <typename T, typename U = T>
+-		inline void write(u32 addr, U value, ppu_thread* = nullptr)
++		inline void write(u32 addr, U value, ppu_thread* ppu = nullptr)
+ #endif
+ 		{
+ 			using dest_t = std::conditional_t<std::is_void_v<T>, U, T>;
+@@ -329,6 +331,11 @@ namespace vm
+ 				*_ptr<dest_t>(addr) = value;
+ 			}
+ 
++			if constexpr (sizeof(dest_t) <= sizeof(u64) && requires { +value; })
++			{
++				task9_live_trace::trace_player_write(addr, static_cast<u64>(+value), sizeof(dest_t) * CHAR_BIT, ppu);
++			}
++
+ #ifdef RPCS3_HAS_MEMORY_BREAKPOINTS
+ 			if (ppu && g_breakpoint_handler.HasBreakpoint(addr, breakpoint_types::bp_write))
+ 			{
+diff --git a/rpcs3/Emu/RSX/RSXTexture.cpp b/rpcs3/Emu/RSX/RSXTexture.cpp
+index f04968c1c..540666840 100644
+--- a/rpcs3/Emu/RSX/RSXTexture.cpp
++++ b/rpcs3/Emu/RSX/RSXTexture.cpp
+@@ -6,6 +6,7 @@
+ #include "Program/GLSLCommon.h"
+ 
+ #include "Emu/system_config.h"
++#include "Emu/task9_live_trace.h"
+ #include "util/simd.hpp"
+ 
+ #if !defined(_MSC_VER)
+@@ -25,7 +26,13 @@ namespace rsx
+ {
+ 	u32 fragment_texture::offset() const
+ 	{
+-		return registers[NV4097_SET_TEXTURE_OFFSET + (m_index * 8)] & 0x7FFFFFFF;
++		const u32 result = registers[NV4097_SET_TEXTURE_OFFSET + (m_index * 8)] & 0x7FFFFFFF;
++		const u32 format_reg = registers[NV4097_SET_TEXTURE_FORMAT + (m_index * 8)];
++		const u32 image_rect_reg = registers[NV4097_SET_TEXTURE_IMAGE_RECT + (m_index * 8)];
++		const u32 control3_reg = registers[NV4097_SET_TEXTURE_CONTROL3 + m_index];
++
++		task9_live_trace::trace_fragment_texture(m_index, result, format_reg, image_rect_reg, control3_reg);
++		return result;
+ 	}
+ 
+ 	u8 fragment_texture::location() const
+diff --git a/rpcs3/Emu/task9_live_trace.h b/rpcs3/Emu/task9_live_trace.h
+new file mode 100644
+index 000000000..c1a22f09c
+--- /dev/null
++++ b/rpcs3/Emu/task9_live_trace.h
+@@ -0,0 +1,171 @@
++#pragma once
++
++#include "util/types.hpp"
++
++#include <atomic>
++#include <cstdio>
++#include <cstdlib>
++
++namespace task9_live_trace
++{
++	inline bool enabled()
++	{
++		static const bool value = std::getenv("RPCS3_TASK9_TRACE") != nullptr;
++		return value;
++	}
++
++	inline u32 bswap16(u32 value)
++	{
++		return ((value & 0xffu) << 8) | ((value >> 8) & 0xffu);
++	}
++
++	inline u32 bswap32(u32 value)
++	{
++		return ((value & 0x000000ffu) << 24) |
++			((value & 0x0000ff00u) << 8) |
++			((value & 0x00ff0000u) >> 8) |
++			((value & 0xff000000u) >> 24);
++	}
++
++	inline const char* watched_player_name(u32 player_id)
++	{
++		switch (player_id)
++		{
++		case 820: return "FERDINAND_STALE_MANU";
++		case 38590: return "RAFAEL_STALE_MANU";
++		case 32441: return "ANDERSON_STALE_MANU";
++		case 36556: return "CHICHARITO_STALE_MANU";
++		case 1310: return "BERBATOV_STALE_MANU";
++		case 31221: return "VALENCIA_STALE_MANU";
++		case 816: return "SCHOLES_STALE_MANU";
++		case 5029: return "VIDIC_STALE_MANU";
++		case 5404: return "FLETCHER_STALE_MANU";
++		case 793: return "GIGGS_STALE_MANU";
++		case 42669: return "CASEMIRO_EXPECTED_MANU";
++		case 46193: return "FERNANDES_EXPECTED_MANU";
++		case 1296: return "AYDEN_HEAVEN_EXPECTED_MANU";
++		case 37034: return "LENY_YORO_EXPECTED_MANU";
++		case 32430: return "ODEGAARD_ARSENAL_CONTROL";
++		case 113314: return "EZE_ARSENAL_CONTROL";
++		case 811: return "LEWIS_SKELLY_ARSENAL_CONTROL";
++		case 115087: return "MARTINELLI_ARSENAL_CONTROL";
++		case 116424: return "HAVERTZ_ARSENAL_CONTROL";
++		default: return nullptr;
++		}
++	}
++
++	inline bool trace_player_candidate(u32 addr, u64 raw_value, u32 bits, const void* ppu_context, u32 decoded, const char* variant)
++	{
++		if (const char* name = watched_player_name(decoded))
++		{
++			std::fprintf(stderr,
++				"[TASK9][PLAYER_WRITE] bits=%u addr=0x%08x raw=0x%016llx decoded=%u variant=%s label=%s ppu=%p\n",
++				bits,
++				addr,
++				static_cast<unsigned long long>(raw_value),
++				decoded,
++				variant,
++				name,
++				ppu_context);
++			return true;
++		}
++
++		return false;
++	}
++
++	inline void trace_player_write(u32 addr, u64 raw_value, u32 bits, const void* ppu_context)
++	{
++		if (!enabled())
++		{
++			return;
++		}
++
++		if (bits != 16 && bits != 32 && bits != 64)
++		{
++			return;
++		}
++
++		const u32 lo32 = static_cast<u32>(raw_value);
++		const u32 hi32 = static_cast<u32>(raw_value >> 32);
++		const u32 lo16 = lo32 & 0xffffu;
++		const u32 hi16 = (lo32 >> 16) & 0xffffu;
++
++		bool matched = false;
++		matched |= trace_player_candidate(addr, raw_value, bits, ppu_context, lo32, "lo32");
++		matched |= trace_player_candidate(addr, raw_value, bits, ppu_context, bswap32(lo32), "lo32_bswap");
++		matched |= trace_player_candidate(addr, raw_value, bits, ppu_context, lo16, "lo16");
++		matched |= trace_player_candidate(addr, raw_value, bits, ppu_context, bswap16(lo16), "lo16_bswap");
++		matched |= trace_player_candidate(addr, raw_value, bits, ppu_context, hi16, "hi16");
++		matched |= trace_player_candidate(addr, raw_value, bits, ppu_context, bswap16(hi16), "hi16_bswap");
++
++		if (bits == 64)
++		{
++			matched |= trace_player_candidate(addr, raw_value, bits, ppu_context, hi32, "hi32");
++			matched |= trace_player_candidate(addr, raw_value, bits, ppu_context, bswap32(hi32), "hi32_bswap");
++		}
++
++		if (matched)
++		{
++			std::fflush(stderr);
++		}
++	}
++
++	inline bool texture_shape_interesting(u32 width, u32 height, u32 pitch)
++	{
++		if ((width == 1024 && (height == 512 || height == 1024)) ||
++			(width == 512 && (height == 512 || height == 1024)) ||
++			(width == 2048 && height == 1024))
++		{
++			return true;
++		}
++
++		return pitch == 2048 || pitch == 4096 || pitch == 8192;
++	}
++
++	inline void trace_fragment_texture(u32 unit, u32 offset, u32 format_reg, u32 image_rect_reg, u32 control3_reg)
++	{
++		if (!enabled())
++		{
++			return;
++		}
++
++		const u32 location = format_reg & 0x3u;
++		const u32 format = (format_reg >> 8) & 0xffu;
++		const u32 mipmaps = (format_reg >> 16) & 0xffffu;
++		const u32 width = (image_rect_reg >> 16) & 0xffffu;
++		const u32 height = image_rect_reg & 0xffffu;
++		const u32 pitch = control3_reg & 0xfffffu;
++
++		if (!texture_shape_interesting(width, height, pitch))
++		{
++			return;
++		}
++
++		static std::atomic<u64> last_signature[16]{};
++		const u64 signature = (static_cast<u64>(offset) << 32) ^
++			(static_cast<u64>(format_reg) << 1) ^
++			(static_cast<u64>(image_rect_reg) << 17) ^
++			static_cast<u64>(control3_reg) ^
++			static_cast<u64>(unit);
++
++		if (unit < 16 && last_signature[unit].exchange(signature) == signature)
++		{
++			return;
++		}
++
++		std::fprintf(stderr,
++			"[TASK9][RSX_FRAGMENT_TEXTURE] unit=%u offset=0x%08x location_raw=%u format=0x%02x width=%u height=%u pitch=%u mipmaps=%u format_reg=0x%08x image_rect=0x%08x control3=0x%08x\n",
++			unit,
++			offset,
++			location,
++			format,
++			width,
++			height,
++			pitch,
++			mipmaps,
++			format_reg,
++			image_rect_reg,
++			control3_reg);
++		std::fflush(stderr);
++	}
++}

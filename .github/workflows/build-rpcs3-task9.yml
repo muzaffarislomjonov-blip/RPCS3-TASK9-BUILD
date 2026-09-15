@@ -1,0 +1,198 @@
+name: TASK9 RPCS3 cloud build
+
+on:
+  workflow_dispatch:
+
+env:
+  RPCS3_COMMIT: 2416d652625eaed5df2ff8d67063fa145021a883
+  RPCS3_REPO: https://github.com/RPCS3/rpcs3.git
+  PATCH_FILE: patches/RPCS3_TASK9_LIVE_TRACE_FIXED.patch
+  QT_VERSION: 6.11.2
+  QT_ARCH: win64_msvc2022_64
+  VULKAN_VERSION: 1.4.341.1
+  BUILD_CONFIGURATION: Release
+  BUILD_PLATFORM: x64
+  ARTIFACT_NAME: RPCS3_TASK9_TRACE_2416d652
+
+jobs:
+  build:
+    name: Build instrumented RPCS3
+    runs-on: windows-2022
+
+    steps:
+      - name: Checkout build harness
+        uses: actions/checkout@v4
+
+      - name: Confirm harness patch exists
+        shell: pwsh
+        run: |
+          $patch = Join-Path $env:GITHUB_WORKSPACE $env:PATCH_FILE
+          if (!(Test-Path -LiteralPath $patch)) {
+            throw "Patch file not found: $patch"
+          }
+          Get-FileHash -Algorithm SHA256 -LiteralPath $patch
+
+      - name: Clone exact RPCS3 source
+        shell: pwsh
+        run: |
+          git clone $env:RPCS3_REPO rpcs3-src
+          Set-Location rpcs3-src
+          git fetch --all --tags
+          git checkout $env:RPCS3_COMMIT
+          git submodule sync --recursive
+          git submodule update --init --recursive
+          $head = (git rev-parse HEAD).Trim()
+          if ($head -ne $env:RPCS3_COMMIT) {
+            throw "Wrong RPCS3 commit: $head"
+          }
+          git status --short
+
+      - name: Validate and apply TASK9 patch
+        shell: pwsh
+        run: |
+          $patch = Join-Path $env:GITHUB_WORKSPACE $env:PATCH_FILE
+          Set-Location rpcs3-src
+          git apply --check --whitespace=error-all $patch
+          git apply $patch
+          git diff --check
+          git status --short
+
+      - name: Install Qt 6.11.2
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          arch: ${{ env.QT_ARCH }}
+          dir: C:\Qt
+          modules: qtmultimedia qtsvg
+          cache: true
+
+      - name: Configure Qt environment
+        shell: pwsh
+        run: |
+          $qtRoot = "C:\Qt\$env:QT_VERSION\msvc2022_64"
+          if (!(Test-Path -LiteralPath $qtRoot)) {
+            throw "Qt root not found: $qtRoot"
+          }
+          "QTDIR=$qtRoot" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "Qt6_ROOT=$qtRoot" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "$qtRoot\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
+          & "$qtRoot\bin\qmake.exe" -query QT_VERSION
+
+      - name: Install Vulkan SDK 1.4.341.1
+        shell: pwsh
+        run: |
+          $sdkVersion = $env:VULKAN_VERSION
+          $installer = Join-Path $env:RUNNER_TEMP "VulkanSDK-$sdkVersion-Installer.exe"
+          $url = "https://sdk.lunarg.com/sdk/download/$sdkVersion/windows/VulkanSDK-$sdkVersion-Installer.exe"
+          Invoke-WebRequest -Uri $url -OutFile $installer
+          Start-Process -FilePath $installer -ArgumentList "--root C:\VulkanSDK\$sdkVersion --accept-licenses --default-answer --confirm-command install" -Wait -NoNewWindow
+          $sdk = "C:\VulkanSDK\$sdkVersion"
+          if (!(Test-Path -LiteralPath $sdk)) {
+            throw "Vulkan SDK root not found: $sdk"
+          }
+          "VULKAN_SDK=$sdk" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "$sdk\Bin" | Out-File -FilePath $env:GITHUB_PATH -Append
+          & "$sdk\Bin\glslangValidator.exe" --version
+
+      - name: Confirm Python and MSBuild
+        shell: pwsh
+        run: |
+          python --version
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $msbuild = & $vswhere -latest -products * -requires Microsoft.Component.MSBuild -find MSBuild\**\Bin\MSBuild.exe | Select-Object -First 1
+          if (!$msbuild) {
+            throw "MSBuild not found"
+          }
+          "MSBUILD_EXE=$msbuild" | Out-File -FilePath $env:GITHUB_ENV -Append
+          & $msbuild -version
+
+      - name: Prepare precompiled LLVM libraries
+        shell: pwsh
+        run: |
+          $target = Join-Path $env:GITHUB_WORKSPACE "rpcs3-src\build\lib_ext\Release-x64"
+          New-Item -ItemType Directory -Force -Path $target | Out-Null
+          $archive = Join-Path $env:RUNNER_TEMP "llvmlibs_mt.7z"
+          $url = "https://github.com/RPCS3/llvm-mirror/releases/download/custom-build-win-22.1.8/llvmlibs_mt.7z"
+          Invoke-WebRequest -Uri $url -OutFile $archive
+          7z x $archive "-o$target" -y
+          Get-ChildItem -Path $target | Select-Object -First 20
+
+      - name: Build RPCS3 Release x64
+        shell: pwsh
+        run: |
+          Set-Location rpcs3-src
+          & $env:MSBUILD_EXE rpcs3.sln /m /p:Configuration=$env:BUILD_CONFIGURATION /p:Platform=$env:BUILD_PLATFORM /p:PreferredToolArchitecture=x64
+
+      - name: Package runnable TASK9 build
+        shell: pwsh
+        run: |
+          $srcRoot = Join-Path $env:GITHUB_WORKSPACE "rpcs3-src"
+          $candidateBins = @(
+            (Join-Path $srcRoot "bin"),
+            (Join-Path $srcRoot "build-msvc\bin"),
+            (Join-Path $srcRoot "bin\Release-x64"),
+            (Join-Path $srcRoot "x64\Release")
+          )
+          $exe = $null
+          foreach ($dir in $candidateBins) {
+            if (Test-Path -LiteralPath (Join-Path $dir "rpcs3.exe")) {
+              $exe = Join-Path $dir "rpcs3.exe"
+              break
+            }
+          }
+          if (!$exe) {
+            $exe = Get-ChildItem -Path $srcRoot -Filter rpcs3.exe -Recurse | Select-Object -First 1 -ExpandProperty FullName
+          }
+          if (!$exe) {
+            throw "rpcs3.exe not found after build"
+          }
+
+          $binDir = Split-Path -Parent $exe
+          $package = Join-Path $env:GITHUB_WORKSPACE "package\RPCS3_TASK9_TRACE_2416d652"
+          New-Item -ItemType Directory -Force -Path $package | Out-Null
+          Copy-Item -Path (Join-Path $binDir "*") -Destination $package -Recurse -Force
+
+          $qtBin = Join-Path $env:QTDIR "bin"
+          $qtPlugins = Join-Path $env:QTDIR "plugins"
+          $qtDlls = @("Qt6Core.dll", "Qt6Gui.dll", "Qt6Widgets.dll", "Qt6Network.dll", "Qt6Multimedia.dll", "Qt6Svg.dll")
+          foreach ($dll in $qtDlls) {
+            $source = Join-Path $qtBin $dll
+            if (Test-Path -LiteralPath $source) {
+              Copy-Item -LiteralPath $source -Destination $package -Force
+            }
+          }
+          foreach ($pluginDir in @("platforms", "imageformats", "styles", "iconengines", "tls", "multimedia")) {
+            $source = Join-Path $qtPlugins $pluginDir
+            if (Test-Path -LiteralPath $source) {
+              Copy-Item -LiteralPath $source -Destination (Join-Path $package $pluginDir) -Recurse -Force
+            }
+          }
+
+          $patch = Join-Path $env:GITHUB_WORKSPACE $env:PATCH_FILE
+          $patchSha = (Get-FileHash -Algorithm SHA256 -LiteralPath $patch).Hash
+          $timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+          @"
+          RPCS3 exact source commit: $env:RPCS3_COMMIT
+          TASK9 patch SHA256: $patchSha
+          Build configuration: $env:BUILD_CONFIGURATION $env:BUILD_PLATFORM
+          Runner: windows-2022
+          Qt version: $env:QT_VERSION
+          Vulkan SDK version: $env:VULKAN_VERSION
+          Build timestamp UTC: $timestamp
+          Instrumentation enabled: YES
+          Runtime trace switch: set RPCS3_TASK9_TRACE=1 before launching rpcs3.exe
+          "@ | Set-Content -LiteralPath (Join-Path $package "TASK9_BUILD_INFO.txt") -Encoding ASCII
+
+          @"
+          This artifact contains an instrumented RPCS3 build only.
+          It does not include PES game files, PS3 firmware, saves, DATA.BIN, EDIT.bin, dt0c, or any game content.
+          "@ | Set-Content -LiteralPath (Join-Path $package "TASK9_README.txt") -Encoding ASCII
+
+          Get-ChildItem -Path $package | Select-Object Name, Length
+
+      - name: Upload TASK9 RPCS3 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: package/RPCS3_TASK9_TRACE_2416d652
+          if-no-files-found: error
