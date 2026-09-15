@@ -69,10 +69,13 @@ jobs:
           python -m pip install "git+https://github.com/miurahr/aqtinstall.git@9e49c82edc6d946db376dec907cca5b4b486eec5"
           python --version
           python -m aqt version
-          $installerVersion = python -m aqt version
-          $legacyAqt = [string]::Join(".", @("3", "3", "0"))
-          if ($installerVersion.Contains($legacyAqt)) {
-            throw "Unexpected legacy Qt installer selected: $installerVersion"
+          $installerVersion = (& python -m aqt version 2>&1 | Out-String).Trim()
+          Write-Host $installerVersion
+          if ([string]::IsNullOrWhiteSpace($installerVersion)) {
+            throw "Unable to determine aqtinstall version"
+          }
+          if ($installerVersion -match 'aqtinstall\(aqt\) v3\.3\.0(\D|$)') {
+            throw "Unexpected legacy aqtinstall 3.3.0 selected"
           }
           python -m aqt install-qt windows desktop 6.11.2 win64_msvc2022_64 -O C:\Qt -m qtmultimedia qtsvg
           $qtBin = "C:\Qt\6.11.2\msvc2022_64\bin"

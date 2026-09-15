@@ -80,3 +80,10 @@ Note: no external YAML parser is installed locally in this Windows environment. 
 - Added manual pinned aqtinstall install from commit 9e49c82edc6d946db376dec907cca5b4b486eec5.
 - Added manual command: python -m aqt install-qt windows desktop 6.11.2 win64_msvc2022_64 -O C:\Qt -m qtmultimedia qtsvg.
 - Verified workflow contains zero install-qt-action occurrences and zero old default aqtinstall markers.
+
+## O1ARCH1H1C-FIX3 stream-safe aqt version check
+
+- Replaced direct PowerShell assignment from python -m aqt version with stream-safe capture:
+  $installerVersion = (& python -m aqt version 2>&1 | Out-String).Trim()
+- Added null/whitespace guard before legacy-version comparison.
+- Kept Python 3.12, Qt 6.11.2, pinned aqt commit, Vulkan SDK 1.4.341.1, LLVM strategy, Release build, RPCS3 commit, and instrumentation patch unchanged.

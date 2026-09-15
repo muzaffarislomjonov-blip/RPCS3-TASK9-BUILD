@@ -1,0 +1,43 @@
+TASK 9 - PHASE O1ARCH1H1C-FIX3 NULL AQT VERSION CHECK REPORT
+
+1. null-version bug fixed YES/NO
+YES
+
+2. stream-safe aqt version capture added YES/NO
+YES
+$installerVersion = (& python -m aqt version 2>&1 | Out-String).Trim()
+
+3. Python still 3.12 YES/NO
+YES
+
+4. pinned aqt unchanged YES/NO
+YES
+9e49c82edc6d946db376dec907cca5b4b486eec5
+
+5. Qt still 6.11.2 YES/NO
+YES
+
+6. install-qt command preserved YES/NO
+YES
+python -m aqt install-qt windows desktop 6.11.2 win64_msvc2022_64 -O C:\Qt -m qtmultimedia qtsvg
+
+7. RPCS3 commit unchanged YES/NO
+YES
+2416d652625eaed5df2ff8d67063fa145021a883
+
+8. instrumentation patch unchanged YES/NO
+YES
+Patch SHA256: 543C355AD24832CCF603ACC10B6D2B7F1B1A8679E240EDF11595223F5E12FA43
+
+9. YAML validation PASS/FAIL
+PASS_STRUCTURAL_LOCAL
+
+10. READY_TO_COMMIT_PUSH YES/NO
+YES
+
+11. exact PowerShell commit/push commands
+cd "D:\New project pes\TASK9_OUTPUT\PHASE_O1ARCH1H1C_GITHUB_ACTIONS_BUILD"
+git status
+git add .github\workflows\build-rpcs3-task9.yml QT_INSTALL_FIX3_REPORT.txt CLOUD_BUILD_VALIDATION.md
+git commit -m "Fix stream-safe aqt version check"
+git push
