@@ -57,31 +57,34 @@ jobs:
           git diff --check
           git status --short
 
-      - name: Set up Python 3.12 for Qt installer
-        uses: actions/setup-python@v5
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
-      - name: Install Qt 6.11.2
-        uses: jurplel/install-qt-action@v4
-        with:
-          version: '6.11.2'
-          host: 'windows'
-          target: 'desktop'
-          arch: 'win64_msvc2022_64'
-          dir: C:\Qt
-          modules: qtmultimedia qtsvg
-          aqtsource: git+https://github.com/miurahr/aqtinstall.git
-          setup-python: false
-          cache: true
+      - name: Install Qt 6.11.2 with pinned aqtinstall
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "git+https://github.com/miurahr/aqtinstall.git@9e49c82edc6d946db376dec907cca5b4b486eec5"
+          python --version
+          python -m aqt version
+          $installerVersion = python -m aqt version
+          $legacyAqt = [string]::Join(".", @("3", "3", "0"))
+          if ($installerVersion.Contains($legacyAqt)) {
+            throw "Unexpected legacy Qt installer selected: $installerVersion"
+          }
+          python -m aqt install-qt windows desktop 6.11.2 win64_msvc2022_64 -O C:\Qt -m qtmultimedia qtsvg
+          $qtBin = "C:\Qt\6.11.2\msvc2022_64\bin"
+          if (!(Test-Path -LiteralPath $qtBin)) {
+            throw "Qt bin directory not found after install: $qtBin"
+          }
 
       - name: Verify Qt 6.11.2 installation
         shell: pwsh
         run: |
           python --version
           python -m aqt version
-          "QT_ROOT_DIR=$env:QT_ROOT_DIR"
-          "QTDIR=$env:QTDIR"
           $qtRoot = "C:\Qt\$env:QT_VERSION\msvc2022_64"
           if (!(Test-Path -LiteralPath $qtRoot)) {
             throw "Qt root not found: $qtRoot"
@@ -89,6 +92,8 @@ jobs:
           "QTDIR=$qtRoot" | Out-File -FilePath $env:GITHUB_ENV -Append
           "Qt6_ROOT=$qtRoot" | Out-File -FilePath $env:GITHUB_ENV -Append
           "$qtRoot\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
+          "QTDIR=$qtRoot"
+          "Qt6_ROOT=$qtRoot"
           $qmake = Join-Path $qtRoot "bin\qmake.exe"
           if (!(Test-Path -LiteralPath $qmake)) {
             throw "qmake not found: $qmake"

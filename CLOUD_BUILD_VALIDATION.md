@@ -64,3 +64,19 @@ Note: no external YAML parser is installed locally in this Windows environment. 
 - RPCS3 was not built locally.
 - No PES files were modified.
 - No DATA.BIN, EDIT.bin, or dt0c files were touched.
+
+## O1ARCH1H1C-FIX1 Qt installer update
+
+- Python is pinned through ctions/setup-python@v5 with version 3.12.
+- install-qt-action@v4 now uses explicit host, 	arget, and rch inputs.
+- qtsource is set to git+https://github.com/miurahr/aqtinstall.git to avoid the older default aqtinstall 3.3.x Qt 6.11.x layout issue.
+- setup-python: false is set so the action uses the pinned Python environment.
+- Qt verification/fail-early step added before Vulkan/LLVM/RPCS3 build.
+
+## O1ARCH1H1C-FIX2 manual Qt install update
+
+- Removed jurplel/install-qt-action@v4 completely.
+- Added ctions/setup-python@v6 with Python 3.12.
+- Added manual pinned aqtinstall install from commit 9e49c82edc6d946db376dec907cca5b4b486eec5.
+- Added manual command: python -m aqt install-qt windows desktop 6.11.2 win64_msvc2022_64 -O C:\Qt -m qtmultimedia qtsvg.
+- Verified workflow contains zero install-qt-action occurrences and zero old default aqtinstall markers.

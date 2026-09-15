@@ -1,0 +1,60 @@
+TASK 9 - PHASE O1ARCH1H1C-FIX2 MANUAL QT INSTALL REPORT
+
+1. install-qt-action completely removed YES/NO
+YES
+
+2. Python 3.12 explicit setup YES/NO
+YES
+actions/setup-python@v6 with python-version '3.12'
+
+3. pinned Qt-6.11-compatible aqt source YES/NO
+YES
+git+https://github.com/miurahr/aqtinstall.git@9e49c82edc6d946db376dec907cca5b4b486eec5
+
+4. aqtinstall 3.3 default eliminated YES/NO
+YES
+install-qt-action occurrences: 0
+aqtinstall==3.3 / aqtversion / literal 3.3.0 occurrences: 0
+
+5. Qt 6.11.2 install command added YES/NO
+YES
+python -m aqt install-qt windows desktop 6.11.2 win64_msvc2022_64 -O C:\Qt -m qtmultimedia qtsvg
+
+6. qtmultimedia added YES/NO
+YES
+
+7. qtsvg added YES/NO
+YES
+
+8. QTDIR configured YES/NO
+YES
+QTDIR=C:\Qt\6.11.2\msvc2022_64
+
+9. Qt6_ROOT configured YES/NO
+YES
+Qt6_ROOT=C:\Qt\6.11.2\msvc2022_64
+
+10. Qt verification added YES/NO
+YES
+python --version, python -m aqt version, qmake --version, qmake -query QT_VERSION, Test-Path checks.
+
+11. RPCS3 commit unchanged YES/NO
+YES
+2416d652625eaed5df2ff8d67063fa145021a883
+
+12. instrumentation patch unchanged YES/NO
+YES
+Patch SHA256: 543C355AD24832CCF603ACC10B6D2B7F1B1A8679E240EDF11595223F5E12FA43
+
+13. YAML validation PASS/FAIL
+PASS_STRUCTURAL_LOCAL
+
+14. READY_TO_COMMIT_PUSH YES/NO
+YES
+
+15. exact PowerShell commit/push commands
+cd "D:\New project pes\TASK9_OUTPUT\PHASE_O1ARCH1H1C_GITHUB_ACTIONS_BUILD"
+git status
+git add .github\workflows\build-rpcs3-task9.yml QT_INSTALL_FIX2_REPORT.txt CLOUD_BUILD_VALIDATION.md
+git commit -m "Install Qt 6.11.2 manually for TASK9 RPCS3 cloud build"
+git push
