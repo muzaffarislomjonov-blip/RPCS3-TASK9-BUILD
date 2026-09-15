@@ -1,0 +1,51 @@
+TASK 9 - PHASE O1ARCH1H1C-FIX1 QT INSTALL FIX REPORT
+
+1. failure classification
+GitHub Actions Qt install failure caused by jurplel/install-qt-action default aqtinstall 3.3.x path not handling Qt 6.11.x repository layout correctly.
+
+2. old aqtinstall behavior identified YES/NO
+YES
+
+3. Qt version still 6.11.2 YES/NO
+YES
+
+4. Python pinned YES/NO
+YES
+actions/setup-python@v5 with python-version '3.12'
+
+5. aqtinstall source upgraded YES/NO
+YES
+aqtsource: git+https://github.com/miurahr/aqtinstall.git
+
+6. qtmultimedia configured YES/NO
+YES
+modules: qtmultimedia qtsvg
+
+7. Qt verification step added YES/NO
+YES
+Prints python --version, python -m aqt version, QT_ROOT_DIR, QTDIR, qmake --version, and fails unless qmake reports Qt 6.11.2.
+
+8. exact RPCS3 commit unchanged YES/NO
+YES
+2416d652625eaed5df2ff8d67063fa145021a883
+
+9. instrumentation patch unchanged YES/NO
+YES
+Patch SHA256: 543C355AD24832CCF603ACC10B6D2B7F1B1A8679E240EDF11595223F5E12FA43
+
+10. YAML validation PASS/FAIL
+PASS_STRUCTURAL_LOCAL
+
+11. files changed
+D:\New project pes\TASK9_OUTPUT\PHASE_O1ARCH1H1C_GITHUB_ACTIONS_BUILD\.github\workflows\build-rpcs3-task9.yml
+D:\New project pes\TASK9_OUTPUT\PHASE_O1ARCH1H1C_GITHUB_ACTIONS_BUILD\QT_INSTALL_FIX_REPORT.txt
+
+12. ready to commit/push YES/NO
+YES
+
+13. exact PowerShell commands to commit and push
+cd "D:\New project pes\TASK9_OUTPUT\PHASE_O1ARCH1H1C_GITHUB_ACTIONS_BUILD"
+git status
+git add .github\workflows\build-rpcs3-task9.yml QT_INSTALL_FIX_REPORT.txt
+git commit -m "Fix Qt 6.11.2 install for TASK9 RPCS3 cloud build"
+git push
