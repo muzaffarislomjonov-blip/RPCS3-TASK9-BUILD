@@ -87,3 +87,13 @@ Note: no external YAML parser is installed locally in this Windows environment. 
   $installerVersion = (& python -m aqt version 2>&1 | Out-String).Trim()
 - Added null/whitespace guard before legacy-version comparison.
 - Kept Python 3.12, Qt 6.11.2, pinned aqt commit, Vulkan SDK 1.4.341.1, LLVM strategy, Release build, RPCS3 commit, and instrumentation patch unchanged.
+
+## O1ARCH1H1C-FIX4 Vulkan SDK URL update
+
+- Replaced invalid VulkanSDK-<version>-Installer.exe LunarG URL with official automated SDK URL:
+  https://sdk.lunarg.com/sdk/download/$sdkVersion/windows/vulkan_sdk.exe
+- Kept VULKAN_VERSION=1.4.341.1 unchanged.
+- Added installer download existence and size validation.
+- Added copy-only CI install using copy_only=1.
+- Added installer exit-code validation.
+- Added SDK root, glslangValidator.exe, and ulkan.h checks before exporting VULKAN_SDK.

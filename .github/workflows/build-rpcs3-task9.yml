@@ -112,13 +112,41 @@ jobs:
         shell: pwsh
         run: |
           $sdkVersion = $env:VULKAN_VERSION
-          $installer = Join-Path $env:RUNNER_TEMP "VulkanSDK-$sdkVersion-Installer.exe"
-          $url = "https://sdk.lunarg.com/sdk/download/$sdkVersion/windows/VulkanSDK-$sdkVersion-Installer.exe"
-          Invoke-WebRequest -Uri $url -OutFile $installer
-          Start-Process -FilePath $installer -ArgumentList "--root C:\VulkanSDK\$sdkVersion --accept-licenses --default-answer --confirm-command install" -Wait -NoNewWindow
+          $installer = Join-Path $env:RUNNER_TEMP "vulkan_sdk.exe"
           $sdk = "C:\VulkanSDK\$sdkVersion"
+          $url = "https://sdk.lunarg.com/sdk/download/$sdkVersion/windows/vulkan_sdk.exe"
+          Invoke-WebRequest -Uri $url -OutFile $installer
+          if (!(Test-Path -LiteralPath $installer)) {
+            throw "Vulkan SDK installer was not downloaded: $installer"
+          }
+          $installerSize = (Get-Item -LiteralPath $installer).Length
+          if ($installerSize -lt 1048576) {
+            throw "Vulkan SDK installer is suspiciously small: $installerSize bytes"
+          }
+          $p = Start-Process `
+            -FilePath $installer `
+            -ArgumentList @(
+              "--root", $sdk,
+              "--accept-licenses",
+              "--default-answer",
+              "--confirm-command",
+              "install",
+              "copy_only=1"
+            ) `
+            -Wait `
+            -PassThru `
+            -NoNewWindow
+          if ($p.ExitCode -ne 0) {
+            throw "Vulkan SDK installer failed with exit code $($p.ExitCode)"
+          }
           if (!(Test-Path -LiteralPath $sdk)) {
             throw "Vulkan SDK root not found: $sdk"
+          }
+          if (!(Test-Path -LiteralPath "$sdk\Bin\glslangValidator.exe")) {
+            throw "glslangValidator.exe not found in Vulkan SDK"
+          }
+          if (!(Test-Path -LiteralPath "$sdk\Include\vulkan\vulkan.h")) {
+            throw "vulkan.h not found in Vulkan SDK"
           }
           "VULKAN_SDK=$sdk" | Out-File -FilePath $env:GITHUB_ENV -Append
           "$sdk\Bin" | Out-File -FilePath $env:GITHUB_PATH -Append

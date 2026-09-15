@@ -1,0 +1,51 @@
+TASK 9 - O1ARCH1H1C-FIX4 VULKAN SDK URL REPORT
+
+1. Qt step unchanged YES/NO
+YES
+
+2. Vulkan version still 1.4.341.1 YES/NO
+YES
+
+3. old invalid Vulkan URL removed YES/NO
+YES
+Removed VulkanSDK-$sdkVersion-Installer.exe URL construction.
+
+4. official vulkan_sdk.exe URL configured YES/NO
+YES
+https://sdk.lunarg.com/sdk/download/$sdkVersion/windows/vulkan_sdk.exe
+
+5. copy-only CI install configured YES/NO
+YES
+copy_only=1
+
+6. installer exit-code check added YES/NO
+YES
+
+7. SDK directory validation added YES/NO
+YES
+Validates SDK root, Bin\glslangValidator.exe, and Include\vulkan\vulkan.h.
+
+8. glslangValidator validation added YES/NO
+YES
+Runs glslangValidator.exe --version.
+
+9. RPCS3 commit unchanged YES/NO
+YES
+2416d652625eaed5df2ff8d67063fa145021a883
+
+10. instrumentation patch unchanged YES/NO
+YES
+Patch SHA256: 543C355AD24832CCF603ACC10B6D2B7F1B1A8679E240EDF11595223F5E12FA43
+
+11. YAML validation PASS/FAIL
+PASS_STRUCTURAL_LOCAL
+
+12. READY_TO_COMMIT_PUSH YES/NO
+YES
+
+13. exact PowerShell commit/push commands
+cd "D:\New project pes\TASK9_OUTPUT\PHASE_O1ARCH1H1C_GITHUB_ACTIONS_BUILD"
+git status
+git add .github\workflows\build-rpcs3-task9.yml VULKAN_FIX4_REPORT.txt CLOUD_BUILD_VALIDATION.md
+git commit -m "Fix Vulkan SDK download URL for TASK9 cloud build"
+git push
