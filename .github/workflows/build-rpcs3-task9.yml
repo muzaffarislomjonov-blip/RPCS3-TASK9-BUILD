@@ -164,22 +164,42 @@ jobs:
           "MSBUILD_EXE=$msbuild" | Out-File -FilePath $env:GITHUB_ENV -Append
           & $msbuild -version
 
-      - name: Prepare precompiled LLVM libraries
+      - name: Build LLVM dependency from source
         shell: pwsh
         run: |
-          $target = Join-Path $env:GITHUB_WORKSPACE "rpcs3-src\build\lib_ext\Release-x64"
-          New-Item -ItemType Directory -Force -Path $target | Out-Null
-          $archive = Join-Path $env:RUNNER_TEMP "llvmlibs_mt.7z"
-          $url = "https://github.com/RPCS3/llvm-mirror/releases/download/custom-build-win-22.1.8/llvmlibs_mt.7z"
-          Invoke-WebRequest -Uri $url -OutFile $archive
-          7z x $archive "-o$target" -y
-          Get-ChildItem -Path $target | Select-Object -First 20
+          Set-Location rpcs3-src
+          $precompiledPath = Join-Path (Get-Location) "build\lib_ext\Release-x64"
+          Remove-Item -LiteralPath $precompiledPath -Recurse -Force -ErrorAction SilentlyContinue
+          & $env:MSBUILD_EXE rpcs3.sln `
+            /t:llvm_build `
+            /m `
+            /p:Configuration=Release `
+            /p:Platform=x64 `
+            /p:PreferredToolArchitecture=x64
+          if ($LASTEXITCODE -ne 0) {
+            throw "llvm_build failed with exit code $LASTEXITCODE"
+          }
+          $llvmLibs = Get-ChildItem -Path (Get-Location) -Recurse -Filter "LLVM*.lib" -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -notmatch "\\build\\lib_ext\\Release-x64\\" }
+          if (!$llvmLibs) {
+            throw "llvm_build succeeded but no generated LLVM*.lib files were found"
+          }
+          $representative = $llvmLibs |
+            Where-Object { $_.Name -in @("LLVMCore.lib", "LLVMSupport.lib", "LLVMAnalysis.lib") } |
+            Select-Object -First 20
+          if (!$representative) {
+            $representative = $llvmLibs | Select-Object -First 20
+          }
+          $representative | Select-Object FullName, Length
 
       - name: Build RPCS3 Release x64
         shell: pwsh
         run: |
           Set-Location rpcs3-src
           & $env:MSBUILD_EXE rpcs3.sln /m /p:Configuration=$env:BUILD_CONFIGURATION /p:Platform=$env:BUILD_PLATFORM /p:PreferredToolArchitecture=x64
+          if ($LASTEXITCODE -ne 0) {
+            throw "RPCS3 build failed with exit code $LASTEXITCODE"
+          }
 
       - name: Package runnable TASK9 build
         shell: pwsh

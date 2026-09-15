@@ -25,15 +25,26 @@ These requirements come from the `BUILDING.md` file in RPCS3 commit:
 
 ## LLVM dependency strategy
 
-The workflow uses the precompiled LLVM archive referenced by this commit's `BUILDING.md`:
+The workflow builds RPCS3's LLVM dependency from source using the exact source/submodule state checked out by this RPCS3 revision.
 
-`https://github.com/RPCS3/llvm-mirror/releases/download/custom-build-win-22.1.8/llvmlibs_mt.7z`
+It intentionally does not download the historical precompiled LLVM archive, because that binary package produced MSVC STL unresolved externals on the GitHub runner.
 
-It extracts the archive to:
+Before building LLVM, the workflow removes any stale precompiled path:
 
 `rpcs3-src\build\lib_ext\Release-x64`
 
-This avoids building LLVM from source during the GitHub Actions run.
+Then it runs:
+
+```powershell
+& $env:MSBUILD_EXE rpcs3.sln `
+  /t:llvm_build `
+  /m `
+  /p:Configuration=Release `
+  /p:Platform=x64 `
+  /p:PreferredToolArchitecture=x64
+```
+
+This makes LLVM and RPCS3 use the same Visual Studio/MSVC toolchain in the same workflow.
 
 ## Safety
 

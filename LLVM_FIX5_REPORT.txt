@@ -1,0 +1,52 @@
+TASK 9 - O1ARCH1H1C-FIX5 LLVM SOURCE BUILD REPORT
+
+1. precompiled LLVM download removed YES/NO
+YES
+No llvmlibs_mt.7z, custom-build-win-22.1.8, or llvm-mirror download remains in the workflow.
+
+2. old LLVM lib_ext population removed YES/NO
+YES
+The workflow no longer populates build\lib_ext\Release-x64 with precompiled LLVM. It removes that path before source build.
+
+3. llvm_build source target added YES/NO
+YES
+MSBuild target: /t:llvm_build
+
+4. same MSVC used for LLVM and RPCS3 YES/NO
+YES
+Both llvm_build and RPCS3 build use $env:MSBUILD_EXE discovered from Visual Studio on the runner.
+
+5. Release/x64 retained YES/NO
+YES
+
+6. LLVM output validation added YES/NO
+YES
+Workflow searches generated LLVM*.lib files and reports representative LLVMCore.lib / LLVMSupport.lib / LLVMAnalysis.lib where present.
+
+7. RPCS3 build remains after llvm_build YES/NO
+YES
+
+8. exact RPCS3 commit unchanged YES/NO
+YES
+2416d652625eaed5df2ff8d67063fa145021a883
+
+9. instrumentation patch unchanged YES/NO
+YES
+Patch SHA256: 543C355AD24832CCF603ACC10B6D2B7F1B1A8679E240EDF11595223F5E12FA43
+
+10. Qt/Vulkan setup unchanged YES/NO
+YES
+Qt 6.11.2 and Vulkan SDK 1.4.341.1 setup remain intact.
+
+11. YAML validation PASS/FAIL
+PASS_STRUCTURAL_LOCAL
+
+12. READY_TO_COMMIT_PUSH YES/NO
+YES
+
+13. exact PowerShell commit/push commands
+cd "D:\New project pes\TASK9_OUTPUT\PHASE_O1ARCH1H1C_GITHUB_ACTIONS_BUILD"
+git status
+git add .github\workflows\build-rpcs3-task9.yml BUILD_REQUIREMENTS.md CLOUD_BUILD_VALIDATION.md LLVM_FIX5_REPORT.txt
+git commit -m "Build LLVM from source for TASK9 RPCS3 cloud build"
+git push
