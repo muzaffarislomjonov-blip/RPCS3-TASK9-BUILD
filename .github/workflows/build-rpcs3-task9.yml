@@ -170,25 +170,34 @@ jobs:
           Set-Location rpcs3-src
           $precompiledPath = Join-Path (Get-Location) "build\lib_ext\Release-x64"
           Remove-Item -LiteralPath $precompiledPath -Recurse -Force -ErrorAction SilentlyContinue
-          & $env:MSBUILD_EXE rpcs3.sln `
-            /t:llvm_build `
+          $llvmProject = Join-Path $PWD "3rdparty\llvm\llvm_build.vcxproj"
+          if (!(Test-Path -LiteralPath $llvmProject)) {
+            throw "llvm_build.vcxproj not found: $llvmProject"
+          }
+          $solutionDir = "$PWD\"
+          & $env:MSBUILD_EXE `
+            $llvmProject `
             /m `
             /p:Configuration=Release `
             /p:Platform=x64 `
-            /p:PreferredToolArchitecture=x64
+            /p:PreferredToolArchitecture=x64 `
+            "/p:SolutionDir=$solutionDir"
           if ($LASTEXITCODE -ne 0) {
-            throw "llvm_build failed with exit code $LASTEXITCODE"
+            throw "Direct llvm_build.vcxproj build failed with exit code $LASTEXITCODE"
           }
-          $llvmLibs = Get-ChildItem -Path (Get-Location) -Recurse -Filter "LLVM*.lib" -ErrorAction SilentlyContinue |
-            Where-Object { $_.FullName -notmatch "\\build\\lib_ext\\Release-x64\\" }
+          $llvmOut = Join-Path $PWD "build\lib\Release-x64\llvm_build"
+          if (!(Test-Path -LiteralPath $llvmOut)) {
+            throw "Local LLVM install directory missing: $llvmOut"
+          }
+          $llvmLibs = Get-ChildItem -Path $llvmOut -Recurse -Filter "LLVM*.lib" -ErrorAction SilentlyContinue
           if (!$llvmLibs) {
-            throw "llvm_build succeeded but no generated LLVM*.lib files were found"
+            throw "No locally built LLVM libraries found"
           }
           $representative = $llvmLibs |
             Where-Object { $_.Name -in @("LLVMCore.lib", "LLVMSupport.lib", "LLVMAnalysis.lib") } |
-            Select-Object -First 20
+            Select-Object -First 30
           if (!$representative) {
-            $representative = $llvmLibs | Select-Object -First 20
+            $representative = $llvmLibs | Select-Object -First 30
           }
           $representative | Select-Object FullName, Length
 

@@ -1,0 +1,49 @@
+TASK 9 - O1ARCH1H1C-FIX6 DIRECT LLVM PROJECT BUILD REPORT
+
+1. wrong rpcs3.sln /t:llvm_build command removed YES/NO
+YES
+
+2. llvm_build.vcxproj direct build configured YES/NO
+YES
+3rdparty\llvm\llvm_build.vcxproj
+
+3. SolutionDir explicitly supplied YES/NO
+YES
+/p:SolutionDir=$solutionDir
+
+4. Release|x64 preserved YES/NO
+YES
+
+5. /t:llvm_build absent YES/NO
+YES
+
+6. local LLVM output validation added YES/NO
+YES
+Validates build\lib\Release-x64\llvm_build and LLVM*.lib files.
+
+7. RPCS3 solution build remains after LLVM YES/NO
+YES
+
+8. RPCS3 commit unchanged YES/NO
+YES
+2416d652625eaed5df2ff8d67063fa145021a883
+
+9. instrumentation patch unchanged YES/NO
+YES
+Patch SHA256: 543C355AD24832CCF603ACC10B6D2B7F1B1A8679E240EDF11595223F5E12FA43
+
+10. Qt/Vulkan unchanged YES/NO
+YES
+
+11. YAML validation PASS/FAIL
+PASS_STRUCTURAL_LOCAL
+
+12. READY_TO_COMMIT_PUSH YES/NO
+YES
+
+13. exact PowerShell commit/push commands
+cd "D:\New project pes\TASK9_OUTPUT\PHASE_O1ARCH1H1C_GITHUB_ACTIONS_BUILD"
+git status
+git add .github\workflows\build-rpcs3-task9.yml BUILD_REQUIREMENTS.md CLOUD_BUILD_VALIDATION.md LLVM_FIX6_REPORT.txt
+git commit -m "Build llvm_build project directly for TASK9 cloud build"
+git push

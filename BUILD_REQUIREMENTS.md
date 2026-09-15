@@ -37,14 +37,17 @@ Then it runs:
 
 ```powershell
 & $env:MSBUILD_EXE rpcs3.sln `
-  /t:llvm_build `
+  3rdparty\llvm\llvm_build.vcxproj `
   /m `
   /p:Configuration=Release `
   /p:Platform=x64 `
-  /p:PreferredToolArchitecture=x64
+  /p:PreferredToolArchitecture=x64 `
+  "/p:SolutionDir=<rpcs3-src>\"
 ```
 
-This makes LLVM and RPCS3 use the same Visual Studio/MSVC toolchain in the same workflow.
+The workflow builds the `llvm_build.vcxproj` project directly. It does not invoke the old solution-level LLVM target form on `rpcs3.sln`.
+
+This makes LLVM and RPCS3 use the same Visual Studio/MSVC toolchain in the same workflow while avoiding target propagation to unrelated projects.
 
 ## Safety
 

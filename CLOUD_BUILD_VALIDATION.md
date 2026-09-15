@@ -16,43 +16,31 @@
 - Patch validation included: git apply --check --whitespace=error-all
 - Patch whitespace check included: git diff --check
 
-## Qt
+## Qt and Vulkan
 
 - Python setup: ctions/setup-python@v6, Python 3.12
-- Qt install method: manual python -m aqt install-qt
-- Pinned aqt source: git+https://github.com/miurahr/aqtinstall.git@9e49c82edc6d946db376dec907cca5b4b486eec5
-- Qt version: 6.11.2
-- Qt arch: win64_msvc2022_64
+- Qt install: manual python -m aqt install-qt, Qt 6.11.2, arch win64_msvc2022_64
 - Qt modules: qtmultimedia qtsvg
-- install-qt-action occurrences: 0
-- Qt verification/fail-early: YES
-
-## Vulkan
-
-- Vulkan SDK version: 1.4.341.1
-- Download URL: https://sdk.lunarg.com/sdk/download/$sdkVersion/windows/vulkan_sdk.exe
-- Copy-only CI install: copy_only=1
-- Installer exit-code check: YES
-- SDK root validation: YES
-- glslangValidator.exe validation: YES
-- ulkan.h validation: YES
+- Vulkan SDK: 1.4.341.1, official ulkan_sdk.exe URL, copy-only CI install
 
 ## LLVM
 
 - Precompiled LLVM download: REMOVED
 - Historical llvmlibs_mt.7z download: REMOVED
 - Stale precompiled path removed before build: pcs3-src\build\lib_ext\Release-x64
-- LLVM build method: MSBuild rpcs3.sln /t:llvm_build
+- LLVM build method: direct MSBuild of 3rdparty\llvm\llvm_build.vcxproj
+- Old solution-level LLVM target invocation on pcs3.sln: ABSENT
+- SolutionDir explicitly supplied to the project build: YES
 - LLVM configuration: Release|x64
 - Same MSBuild/MSVC path used for LLVM and RPCS3: YES
-- LLVM output validation: searches generated LLVM*.lib files and reports representative libs.
+- LLVM output validation: checks uild\lib\Release-x64\llvm_build and reports generated LLVM*.lib files.
 
 ## RPCS3 build
 
 - Solution: pcs3.sln
 - Configuration: Release
 - Platform: x64
-- RPCS3 build runs after llvm_build: YES
+- RPCS3 build runs after direct LLVM project build: YES
 - RPCS3 build exit-code check: YES
 
 ## Local structural validation
@@ -71,8 +59,9 @@ Checks passed:
 - Qt 6.11.2 appears in workflow
 - Vulkan SDK 1.4.341.1 appears in workflow
 - MSBuild discovery appears in workflow
-- llvm_build target appears before RPCS3 build
-- precompiled LLVM download strings are absent
+- direct llvm_build.vcxproj build appears before RPCS3 build
+- old solution-level LLVM target invocation is absent from workflow
+- precompiled LLVM download strings are absent from workflow
 - Release x64 build setting appears in workflow
 - artifact upload appears in workflow
 
