@@ -205,10 +205,36 @@ jobs:
         shell: pwsh
         run: |
           Set-Location rpcs3-src
-          & $env:MSBUILD_EXE rpcs3.sln /m /p:Configuration=$env:BUILD_CONFIGURATION /p:Platform=$env:BUILD_PLATFORM /p:PreferredToolArchitecture=x64
-          if ($LASTEXITCODE -ne 0) {
-            throw "RPCS3 build failed with exit code $LASTEXITCODE"
+          $sourceSln = Join-Path $PWD "rpcs3.sln"
+          $ciSln = Join-Path $PWD "rpcs3_task9_ci.sln"
+          Copy-Item -LiteralPath $sourceSln -Destination $ciSln -Force
+          $testGuid = "D1CBF84E-07F8-4ACB-9CD2-BD205FDEEE1E"
+          $mainGuid = "70CD65B0-91D6-4FAE-9A7B-4AF55D0D1B12"
+          $content = Get-Content -LiteralPath $ciSln
+          $content = $content | Where-Object {
+            $_ -notmatch "\{$testGuid\}\.(Debug|Release)\|x64\.Build\.0"
           }
+          Set-Content -LiteralPath $ciSln -Value $content -Encoding UTF8
+          $remaining = Select-String -Path $ciSln -Pattern "$testGuid.*Build\.0"
+          if ($remaining) {
+            throw "rpcs3_test Build.0 mapping still enabled"
+          }
+          $mainBuild = Select-String -Path $ciSln -Pattern "$mainGuid\.Release\|x64\.Build\.0"
+          if (!$mainBuild) {
+            throw "Main rpcs3 Release|x64 Build.0 mapping missing"
+          }
+          "TASK9 CI solution: $ciSln"
+          "rpcs3_test Build.0 mappings removed"
+          "main rpcs3 Release|x64 Build.0 mapping preserved"
+          & $env:MSBUILD_EXE $ciSln /m /p:Configuration=$env:BUILD_CONFIGURATION /p:Platform=$env:BUILD_PLATFORM /p:PreferredToolArchitecture=x64
+          if ($LASTEXITCODE -ne 0) {
+            throw "RPCS3 CI Release build failed with exit code $LASTEXITCODE"
+          }
+          $builtExe = Get-ChildItem -Path (Get-Location) -Filter rpcs3.exe -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (!$builtExe) {
+            throw "rpcs3.exe not found after CI solution build"
+          }
+          $builtExe | Select-Object FullName, Length, LastWriteTime
 
       - name: Package runnable TASK9 build
         shell: pwsh

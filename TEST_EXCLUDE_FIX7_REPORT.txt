@@ -1,0 +1,53 @@
+TASK 9 - O1ARCH1H1C-FIX7 EXCLUDE RPCS3 TEST PROJECT REPORT
+
+1. LLVM source build retained YES/NO
+YES
+
+2. GTest installation avoided YES/NO
+YES
+No gtest/googletest/GTestInstalled workflow logic added.
+
+3. original rpcs3.sln unchanged YES/NO
+YES
+Workflow copies rpcs3.sln to rpcs3_task9_ci.sln and edits only the temporary copy.
+
+4. temporary CI solution created YES/NO
+YES
+rpcs3_task9_ci.sln
+
+5. rpcs3_test Release Build.0 removed YES/NO
+YES
+Removes Debug|x64 and Release|x64 Build.0 mappings for GUID D1CBF84E-07F8-4ACB-9CD2-BD205FDEEE1E.
+
+6. main rpcs3 Build.0 preserved YES/NO
+YES
+Verifies GUID 70CD65B0-91D6-4FAE-9A7B-4AF55D0D1B12 Release|x64 Build.0 remains.
+
+7. final build uses CI solution YES/NO
+YES
+MSBuild uses $ciSln.
+
+8. rpcs3.exe verification added YES/NO
+YES
+Prints FullName, Length, LastWriteTime after CI solution build.
+
+9. RPCS3 commit unchanged YES/NO
+YES
+2416d652625eaed5df2ff8d67063fa145021a883
+
+10. instrumentation patch unchanged YES/NO
+YES
+Patch SHA256: 543C355AD24832CCF603ACC10B6D2B7F1B1A8679E240EDF11595223F5E12FA43
+
+11. YAML validation PASS/FAIL
+PASS_STRUCTURAL_LOCAL
+
+12. READY_TO_COMMIT_PUSH YES/NO
+YES
+
+13. exact PowerShell commit/push commands
+cd "D:\New project pes\TASK9_OUTPUT\PHASE_O1ARCH1H1C_GITHUB_ACTIONS_BUILD"
+git status
+git add .github\workflows\build-rpcs3-task9.yml CLOUD_BUILD_VALIDATION.md TEST_EXCLUDE_FIX7_REPORT.txt
+git commit -m "Exclude RPCS3 test project from TASK9 cloud release build"
+git push

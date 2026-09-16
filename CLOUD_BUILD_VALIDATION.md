@@ -27,21 +27,21 @@
 
 - Precompiled LLVM download: REMOVED
 - Historical llvmlibs_mt.7z download: REMOVED
-- Stale precompiled path removed before build: pcs3-src\build\lib_ext\Release-x64
 - LLVM build method: direct MSBuild of 3rdparty\llvm\llvm_build.vcxproj
 - Old solution-level LLVM target invocation on pcs3.sln: ABSENT
 - SolutionDir explicitly supplied to the project build: YES
 - LLVM configuration: Release|x64
-- Same MSBuild/MSVC path used for LLVM and RPCS3: YES
-- LLVM output validation: checks uild\lib\Release-x64\llvm_build and reports generated LLVM*.lib files.
+- LLVM output validation: checks uild\lib\Release-x64\llvm_build and generated LLVM*.lib files.
 
 ## RPCS3 build
 
-- Solution: pcs3.sln
-- Configuration: Release
-- Platform: x64
-- RPCS3 build runs after direct LLVM project build: YES
-- RPCS3 build exit-code check: YES
+- Original pcs3.sln is copied to temporary pcs3_task9_ci.sln before final application build.
+- Original pcs3.sln is not edited by the workflow.
+- Test project GUID excluded from temp solution Build.0 mappings: D1CBF84E-07F8-4ACB-9CD2-BD205FDEEE1E
+- Main RPCS3 project GUID Build.0 mapping verified present: 70CD65B0-91D6-4FAE-9A7B-4AF55D0D1B12
+- GoogleTest installation: NOT USED
+- Final application build uses pcs3_task9_ci.sln.
+- pcs3.exe verification added after build: FullName, Length, LastWriteTime.
 
 ## Local structural validation
 
@@ -52,18 +52,16 @@ Checks passed:
 - workflow file exists
 - patch path exists
 - workflow_dispatch exists
-- runner is windows-2022
 - exact RPCS3 commit appears in workflow
-- recursive submodule update appears in workflow
-- git apply --check --whitespace=error-all appears in workflow
-- Qt 6.11.2 appears in workflow
-- Vulkan SDK 1.4.341.1 appears in workflow
-- MSBuild discovery appears in workflow
-- direct llvm_build.vcxproj build appears before RPCS3 build
-- old solution-level LLVM target invocation is absent from workflow
-- precompiled LLVM download strings are absent from workflow
-- Release x64 build setting appears in workflow
-- artifact upload appears in workflow
+- Qt 6.11.2 and Vulkan SDK 1.4.341.1 remain configured
+- LLVM local source build remains configured
+- no GoogleTest install command appears
+- temporary CI solution creation appears
+- test project Build.0 removal appears
+- main RPCS3 Build.0 preservation check appears
+- final build uses CI solution
+- rpcs3.exe verification appears
+- artifact upload appears
 
 ## Not performed locally
 
