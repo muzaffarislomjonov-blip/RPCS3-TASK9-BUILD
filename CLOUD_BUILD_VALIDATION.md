@@ -16,29 +16,23 @@
 - Patch validation included: git apply --check --whitespace=error-all
 - Patch whitespace check included: git diff --check
 
-## Qt and Vulkan
+## Qt, Vulkan, LLVM
 
 - Python setup: ctions/setup-python@v6, Python 3.12
-- Qt install: manual python -m aqt install-qt, Qt 6.11.2, arch win64_msvc2022_64
-- Qt modules: qtmultimedia qtsvg
+- Qt: manual install, version 6.11.2, arch win64_msvc2022_64, modules qtmultimedia qtsvg
 - Vulkan SDK: 1.4.341.1, official ulkan_sdk.exe URL, copy-only CI install
+- LLVM: direct MSBuild of 3rdparty\llvm\llvm_build.vcxproj, no precompiled LLVM archive
 
-## LLVM
-
-- Precompiled LLVM download: REMOVED
-- Historical llvmlibs_mt.7z download: REMOVED
-- LLVM build method: direct MSBuild of 3rdparty\llvm\llvm_build.vcxproj
-- Old solution-level LLVM target invocation on pcs3.sln: ABSENT
-- SolutionDir explicitly supplied to the project build: YES
-- LLVM configuration: Release|x64
-- LLVM output validation: checks uild\lib\Release-x64\llvm_build and generated LLVM*.lib files.
-
-## RPCS3 build
+## RPCS3 build and test exclusion
 
 - Original pcs3.sln is copied to temporary pcs3_task9_ci.sln before final application build.
 - Original pcs3.sln is not edited by the workflow.
 - Test project GUID excluded from temp solution Build.0 mappings: D1CBF84E-07F8-4ACB-9CD2-BD205FDEEE1E
-- Main RPCS3 project GUID Build.0 mapping verified present: 70CD65B0-91D6-4FAE-9A7B-4AF55D0D1B12
+- Test project Release|x64.ActiveCfg is verified preserved.
+- Main RPCS3 project GUID: 70CD65B0-91D6-4FAE-9A7B-4AF55D0D1B12
+- Main Release|x64.ActiveCfg is verified with -SimpleMatch and braces included.
+- Main Release|x64.Build.0 is verified with -SimpleMatch and braces included.
+- Old missing-brace regex check is removed.
 - GoogleTest installation: NOT USED
 - Final application build uses pcs3_task9_ci.sln.
 - pcs3.exe verification added after build: FullName, Length, LastWriteTime.
@@ -49,19 +43,13 @@ PASS
 
 Checks passed:
 
-- workflow file exists
-- patch path exists
-- workflow_dispatch exists
-- exact RPCS3 commit appears in workflow
-- Qt 6.11.2 and Vulkan SDK 1.4.341.1 remain configured
-- LLVM local source build remains configured
-- no GoogleTest install command appears
-- temporary CI solution creation appears
-- test project Build.0 removal appears
-- main RPCS3 Build.0 preservation check appears
-- final build uses CI solution
-- rpcs3.exe verification appears
-- artifact upload appears
+- old $mainGuid\.Release\|x64\.Build\.0 regex is absent
+- -SimpleMatch is used for solution GUID verification
+- test Build.0 mappings are removed while ActiveCfg is preserved
+- main Release ActiveCfg and Build.0 are both verified
+- LLVM local source build remains unchanged
+- final MSBuild uses the CI solution
+- exact RPCS3 commit and instrumentation patch remain unchanged
 
 ## Not performed locally
 

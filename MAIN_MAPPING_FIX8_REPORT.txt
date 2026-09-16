@@ -1,0 +1,50 @@
+TASK 9 - O1ARCH1H1C-FIX8 MAIN BUILD MAPPING CHECK REPORT
+
+1. false-negative cause confirmed YES/NO
+YES
+The prior regex omitted required braces around the solution GUID.
+
+2. missing-brace regex removed YES/NO
+YES
+
+3. -SimpleMatch verification used YES/NO
+YES
+
+4. test Build.0 mappings still removed YES/NO
+YES
+
+5. test ActiveCfg preserved YES/NO
+YES
+
+6. main Release ActiveCfg verified YES/NO
+YES
+
+7. main Release Build.0 verified YES/NO
+YES
+
+8. LLVM source build unchanged YES/NO
+YES
+
+9. final MSBuild retained YES/NO
+YES
+
+10. exact RPCS3 commit unchanged YES/NO
+YES
+2416d652625eaed5df2ff8d67063fa145021a883
+
+11. instrumentation patch unchanged YES/NO
+YES
+Patch SHA256: 543C355AD24832CCF603ACC10B6D2B7F1B1A8679E240EDF11595223F5E12FA43
+
+12. YAML validation PASS/FAIL
+PASS_STRUCTURAL_LOCAL
+
+13. READY_TO_COMMIT_PUSH YES/NO
+YES
+
+14. exact PowerShell commit/push commands
+cd "D:\New project pes\TASK9_OUTPUT\PHASE_O1ARCH1H1C_GITHUB_ACTIONS_BUILD"
+git status
+git add .github\workflows\build-rpcs3-task9.yml CLOUD_BUILD_VALIDATION.md MAIN_MAPPING_FIX8_REPORT.txt
+git commit -m "Fix main RPCS3 solution mapping verification"
+git push

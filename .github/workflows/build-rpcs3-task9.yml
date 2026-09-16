@@ -215,16 +215,41 @@ jobs:
             $_ -notmatch "\{$testGuid\}\.(Debug|Release)\|x64\.Build\.0"
           }
           Set-Content -LiteralPath $ciSln -Value $content -Encoding UTF8
-          $remaining = Select-String -Path $ciSln -Pattern "$testGuid.*Build\.0"
-          if ($remaining) {
+          $remainingTestBuild = Select-String -Path $ciSln -SimpleMatch -Pattern "{$testGuid}" |
+            Where-Object { $_.Line -like "*.Build.0*" }
+          if ($remainingTestBuild) {
+            Write-Host "Unexpected test Build.0 mappings:"
+            $remainingTestBuild | ForEach-Object { Write-Host $_.Line }
             throw "rpcs3_test Build.0 mapping still enabled"
           }
-          $mainBuild = Select-String -Path $ciSln -Pattern "$mainGuid\.Release\|x64\.Build\.0"
+          $testActive = Select-String -Path $ciSln -SimpleMatch -Pattern "{$testGuid}.Release|x64.ActiveCfg = Release|x64"
+          if (!$testActive) {
+            throw "rpcs3_test Release|x64 ActiveCfg mapping was unexpectedly removed"
+          }
+          $expectedMainActive = "{$mainGuid}.Release|x64.ActiveCfg = Release|x64"
+          $expectedMainBuild = "{$mainGuid}.Release|x64.Build.0 = Release|x64"
+          $mainActive = Select-String -Path $ciSln -SimpleMatch -Pattern $expectedMainActive
+          if (!$mainActive) {
+            Write-Host "Expected main ActiveCfg mapping:"
+            Write-Host $expectedMainActive
+            Write-Host "Actual lines containing main GUID:"
+            Select-String -Path $ciSln -SimpleMatch -Pattern $mainGuid |
+              ForEach-Object { Write-Host $_.Line }
+            throw "Main rpcs3 Release|x64 ActiveCfg mapping missing"
+          }
+          $mainBuild = Select-String -Path $ciSln -SimpleMatch -Pattern $expectedMainBuild
           if (!$mainBuild) {
+            Write-Host "Expected main Build.0 mapping:"
+            Write-Host $expectedMainBuild
+            Write-Host "Actual lines containing main GUID:"
+            Select-String -Path $ciSln -SimpleMatch -Pattern $mainGuid |
+              ForEach-Object { Write-Host $_.Line }
             throw "Main rpcs3 Release|x64 Build.0 mapping missing"
           }
           "TASK9 CI solution: $ciSln"
           "rpcs3_test Build.0 mappings removed"
+          "rpcs3_test Release|x64 ActiveCfg mapping preserved"
+          "main rpcs3 Release|x64 ActiveCfg mapping preserved"
           "main rpcs3 Release|x64 Build.0 mapping preserved"
           & $env:MSBUILD_EXE $ciSln /m /p:Configuration=$env:BUILD_CONFIGURATION /p:Platform=$env:BUILD_PLATFORM /p:PreferredToolArchitecture=x64
           if ($LASTEXITCODE -ne 0) {
