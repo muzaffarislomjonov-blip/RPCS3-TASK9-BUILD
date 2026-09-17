@@ -1,5 +1,197 @@
+diff --git a/rpcs3/Emu/Cell/PPUInterpreter.cpp b/rpcs3/Emu/Cell/PPUInterpreter.cpp
+index d01eac389..8e3463f47 100644
+--- a/rpcs3/Emu/Cell/PPUInterpreter.cpp
++++ b/rpcs3/Emu/Cell/PPUInterpreter.cpp
+@@ -44,11 +44,11 @@ void ppubreak(ppu_thread& ppu)
+ #define PPU_WRITE_32(addr, value) vm::write32(addr, value, &ppu);
+ #define PPU_WRITE_64(addr, value) vm::write64(addr, value, &ppu);
+ #else
+-#define PPU_WRITE(type, addr, value) vm::write<type>(addr, value);
+-#define PPU_WRITE_8(addr, value) vm::write8(addr, value);
+-#define PPU_WRITE_16(addr, value) vm::write16(addr, value);
+-#define PPU_WRITE_32(addr, value) vm::write32(addr, value);
+-#define PPU_WRITE_64(addr, value) vm::write64(addr, value);
++#define PPU_WRITE(type, addr, value) vm::write<type>(addr, value, &ppu);
++#define PPU_WRITE_8(addr, value) vm::write8(addr, value, &ppu);
++#define PPU_WRITE_16(addr, value) vm::write16(addr, value, &ppu);
++#define PPU_WRITE_32(addr, value) vm::write32(addr, value, &ppu);
++#define PPU_WRITE_64(addr, value) vm::write64(addr, value, &ppu);
+ #endif
+ 
+ extern bool is_debugger_present();
+diff --git a/rpcs3/Emu/Cell/PPUThread.cpp b/rpcs3/Emu/Cell/PPUThread.cpp
+index db25e65f2..67b9c49e7 100644
+--- a/rpcs3/Emu/Cell/PPUThread.cpp
++++ b/rpcs3/Emu/Cell/PPUThread.cpp
+@@ -8,6 +8,7 @@
+ #include "Loader/mself.hpp"
+ #include "Emu/localized_string.h"
+ #include "Emu/perf_meter.hpp"
++#include "Emu/task9_live_trace.h"
+ #include "Emu/Memory/vm_reservation.h"
+ #include "Emu/Memory/vm_locking.h"
+ #include "Emu/RSX/Core/RSXReservationLock.hpp"
+@@ -81,6 +82,158 @@ extern void mov_rdata(spu_rdata_t& _dst, const spu_rdata_t& _src);
+ extern void mov_rdata_nt(spu_rdata_t& _dst, const spu_rdata_t& _src);
+ extern bool cmp_rdata(const spu_rdata_t& _lhs, const spu_rdata_t& _rhs);
+ 
++namespace task9_live_trace
++{
++	static bool trace_player_candidate_with_ppu(u32 addr, u64 raw_value, u32 bits, ppu_thread* ppu, u32 decoded, const char* variant)
++	{
++		const char* name = watched_player_name(decoded);
++
++		if (!name)
++		{
++			return false;
++		}
++
++		const bool focus_addr = addr == 0x50300450;
++		std::fprintf(stderr,
++			"[TASK9][PLAYER_WRITE_CALLER] bits=%u addr=0x%08x focus50300450=%s raw=0x%016llx decoded=%u variant=%s label=%s ppu_id=0x%08x cia=0x%08x lr=0x%08llx\n",
++			bits,
++			addr,
++			focus_addr ? "YES" : "NO",
++			static_cast<unsigned long long>(raw_value),
++			decoded,
++			variant,
++			name,
++			ppu ? ppu->id : 0,
++			ppu ? ppu->cia : 0,
++			static_cast<unsigned long long>(ppu ? ppu->lr : 0));
++
++		if (!ppu)
++		{
++			return true;
++		}
++
++		for (u32 reg = 0; reg < 32; reg++)
++		{
++			const u64 value = ppu->gpr[reg];
++
++			if (static_cast<u32>(value) == decoded || bswap32(static_cast<u32>(value)) == decoded ||
++				(value & 0xffffu) == decoded || bswap16(static_cast<u32>(value) & 0xffffu) == decoded)
++			{
++				std::fprintf(stderr,
++					"[TASK9][PLAYER_WRITE_REGISTER] dest=0x%08x decoded=%u label=%s gpr=r%u value=0x%016llx\n",
++					addr,
++					decoded,
++					name,
++					reg,
++					static_cast<unsigned long long>(value));
++			}
++
++			if (value > u32{umax})
++			{
++				continue;
++			}
++
++			const u32 base = static_cast<u32>(value);
++
++			if (!vm::check_addr(base, vm::page_readable, 0x40))
++			{
++				continue;
++			}
++
++			for (u32 rel = 0; rel <= 0x3c; rel += 2)
++			{
++				const u32 hit = base + rel;
++				const u16 raw16 = +vm::read16(hit);
++				bool source_match = raw16 == decoded || bswap16(raw16) == decoded;
++				u32 raw32 = 0;
++
++				if (vm::check_addr(hit, vm::page_readable, 4))
++				{
++					raw32 = +vm::read32(hit);
++					source_match = source_match || raw32 == decoded || bswap32(raw32) == decoded;
++				}
++
++				if (source_match)
++				{
++					std::fprintf(stderr,
++						"[TASK9][PLAYER_WRITE_SOURCE_CANDIDATE] dest=0x%08x decoded=%u label=%s gpr=r%u base=0x%08x hit=0x%08x rel=0x%02x raw16be=0x%04x raw32be=0x%08x\n",
++						addr,
++						decoded,
++						name,
++						reg,
++						base,
++						hit,
++						rel,
++						raw16,
++						raw32);
++				}
++			}
++		}
++
++		const auto stack = ppu->dump_callstack_list();
++
++		if (stack.empty())
++		{
++			std::fprintf(stderr,
++				"[TASK9][PLAYER_WRITE_CALLSTACK] dest=0x%08x decoded=%u label=%s frames=0\n",
++				addr,
++				decoded,
++				name);
++		}
++		else
++		{
++			u32 index = 0;
++
++			for (const auto& frame : stack)
++			{
++				if (index >= 16)
++				{
++					break;
++				}
++
++				std::fprintf(stderr,
++					"[TASK9][PLAYER_WRITE_CALLSTACK] dest=0x%08x decoded=%u label=%s frame=%u caller=0x%08x sp=0x%08x\n",
++					addr,
++					decoded,
++					name,
++					index,
++					frame.first,
++					frame.second);
++				index++;
++			}
++		}
++
++		return true;
++	}
++
++	void trace_player_write_with_ppu(u32 addr, u64 raw_value, u32 bits, ppu_thread* ppu_context)
++	{
++		const u32 lo32 = static_cast<u32>(raw_value);
++		const u32 hi32 = static_cast<u32>(raw_value >> 32);
++		const u32 lo16 = lo32 & 0xffffu;
++		const u32 hi16 = (lo32 >> 16) & 0xffffu;
++
++		bool matched = false;
++		matched |= trace_player_candidate_with_ppu(addr, raw_value, bits, ppu_context, lo32, "lo32");
++		matched |= trace_player_candidate_with_ppu(addr, raw_value, bits, ppu_context, bswap32(lo32), "lo32_bswap");
++		matched |= trace_player_candidate_with_ppu(addr, raw_value, bits, ppu_context, lo16, "lo16");
++		matched |= trace_player_candidate_with_ppu(addr, raw_value, bits, ppu_context, bswap16(lo16), "lo16_bswap");
++		matched |= trace_player_candidate_with_ppu(addr, raw_value, bits, ppu_context, hi16, "hi16");
++		matched |= trace_player_candidate_with_ppu(addr, raw_value, bits, ppu_context, bswap16(hi16), "hi16_bswap");
++
++		if (bits == 64)
++		{
++			matched |= trace_player_candidate_with_ppu(addr, raw_value, bits, ppu_context, hi32, "hi32");
++			matched |= trace_player_candidate_with_ppu(addr, raw_value, bits, ppu_context, bswap32(hi32), "hi32_bswap");
++		}
++
++		if (matched)
++		{
++			std::fflush(stderr);
++		}
++	}
++}
++
+ // Verify AVX availability for TSX transactions
+ static const bool s_tsx_avx = utils::has_avx();
+ 
 diff --git a/rpcs3/Emu/Memory/vm.h b/rpcs3/Emu/Memory/vm.h
-index c59e32d5b..52c7be39a 100644
+index c59e32d5b..202d7d533 100644
 --- a/rpcs3/Emu/Memory/vm.h
 +++ b/rpcs3/Emu/Memory/vm.h
 @@ -7,6 +7,7 @@
@@ -10,15 +202,22 @@ index c59e32d5b..52c7be39a 100644
  
  class ppu_thread;
  
-@@ -274,6 +275,7 @@ namespace vm
- #endif
+@@ -267,13 +268,10 @@ namespace vm
+ 		return g_base_addr[addr];
+ 	}
+ 
+-#ifdef RPCS3_HAS_MEMORY_BREAKPOINTS
+ 	inline void write8(u32 addr, u8 value, ppu_thread* ppu = nullptr)
+-#else
+-	inline void write8(u32 addr, u8 value)
+-#endif
  	{
  		g_base_addr[addr] = value;
-+		task9_live_trace::trace_player_write(addr, value, 8, nullptr);
++		task9_live_trace::trace_player_write(addr, value, 8, ppu);
  
  #ifdef RPCS3_HAS_MEMORY_BREAKPOINTS
  		if (ppu && g_breakpoint_handler.HasBreakpoint(addr, breakpoint_types::bp_write))
-@@ -319,7 +321,7 @@ namespace vm
+@@ -319,7 +317,7 @@ namespace vm
  		inline void write(u32 addr, U value, ppu_thread* ppu = nullptr)
  #else
  		template <typename T, typename U = T>
@@ -27,7 +226,7 @@ index c59e32d5b..52c7be39a 100644
  #endif
  		{
  			using dest_t = std::conditional_t<std::is_void_v<T>, U, T>;
-@@ -329,6 +331,11 @@ namespace vm
+@@ -329,6 +327,11 @@ namespace vm
  				*_ptr<dest_t>(addr) = value;
  			}
  
@@ -68,10 +267,10 @@ index f04968c1c..540666840 100644
  	u8 fragment_texture::location() const
 diff --git a/rpcs3/Emu/task9_live_trace.h b/rpcs3/Emu/task9_live_trace.h
 new file mode 100644
-index 000000000..c1a22f09c
+index 000000000..ef72f76eb
 --- /dev/null
 +++ b/rpcs3/Emu/task9_live_trace.h
-@@ -0,0 +1,171 @@
+@@ -0,0 +1,181 @@
 +#pragma once
 +
 +#include "util/types.hpp"
@@ -80,8 +279,12 @@ index 000000000..c1a22f09c
 +#include <cstdio>
 +#include <cstdlib>
 +
++class ppu_thread;
++
 +namespace task9_live_trace
 +{
++	void trace_player_write_with_ppu(u32 addr, u64 raw_value, u32 bits, ppu_thread* ppu_context);
++
 +	inline bool enabled()
 +	{
 +		static const bool value = std::getenv("RPCS3_TASK9_TRACE") != nullptr;
@@ -147,7 +350,7 @@ index 000000000..c1a22f09c
 +		return false;
 +	}
 +
-+	inline void trace_player_write(u32 addr, u64 raw_value, u32 bits, const void* ppu_context)
++	inline void trace_player_write(u32 addr, u64 raw_value, u32 bits, ppu_thread* ppu_context)
 +	{
 +		if (!enabled())
 +		{
@@ -156,6 +359,12 @@ index 000000000..c1a22f09c
 +
 +		if (bits != 16 && bits != 32 && bits != 64)
 +		{
++			return;
++		}
++
++		if (ppu_context)
++		{
++			trace_player_write_with_ppu(addr, raw_value, bits, ppu_context);
 +			return;
 +		}
 +
